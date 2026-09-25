@@ -5,13 +5,35 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define PORT 5050
 #define BUFF_MAX 1024
 
-int main(){
+static char buffer[BUFF_MAX];
 
-        char buffer[BUFF_MAX];
+void *handle_client(void *arg){
+        int client_sockfd = *(int *)arg;
+        int bytes_count = 0;
+
+        printf("Client is connected ...\n");
+
+        while((bytes_count=read(STDIN_FILENO, buffer, BUFF_MAX))>0){
+
+                send(client_sockfd, buffer, bytes_count, 0);
+        }
+
+        if(bytes_count==-1){
+                perror("read error: ");
+        }
+
+        close(client_sockfd);
+
+        return NULL;
+}
+
+
+int main(){
 
         int server_socketfd;
         server_socketfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -47,6 +69,7 @@ int main(){
         printf("Binding the server is completed.\n");
 
         int client_sockfd;
+        int rc; // result code
 
         struct sockaddr_in client_addr = {0};
         socklen_t client_sl = sizeof(client_addr);
@@ -73,16 +96,23 @@ int main(){
                         continue;
                 }
 
-                printf("Client connected .....\n");
-
-                while(1){
-                        while((bytes_count=read(STDIN_FILENO, &buffer, BUFF_MAX))!=0){
-
-                                // sending data to client_socket.
-                                send(client_sockfd, &buffer, bytes_count, 0);
-                        }
+                int *p_client_sockfd = malloc(sizeof(int));
+                if(p_client_sockfd==NULL){
+                        perror("Malloc Error: ");
+                        close(client_sockfd);
+                        continue;
                 }
 
+                *p_client_sockfd = client_sockfd;
+
+                pthread_t thr;
+                rc = pthread_create(&thr, NULL, handle_client, p_client_sockfd);
+                if(rc!=0){
+                        fprintf(stderr, "Error while creating thread.\n");
+                        continue;
+                }
+
+                rc = pthread_detach(thr);
         }
 
         return 0;
