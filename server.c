@@ -53,8 +53,6 @@ void *handle_client(void *arg){
         char buffer[BUFF_MAX] = {0};
         int bytes_count = 0;
 
-        printf("Client is connected ...\n");
-
         while((bytes_count=recv(client_sockfd, buffer, BUFF_MAX, 0))>0){
                 broadcast(buffer, bytes_count, client_sockfd);
         }
@@ -78,9 +76,9 @@ void *listen_loop(void *arg){
         while(1){
                 current.client_sockfd = accept(server_sockfd, (struct sockaddr *)&current.client_addr, &addrlen);
                 current.status = 1;
+                printf("Client Connected ...\n");
 
                 pthread_create(&per_client, NULL, handle_client, &current.client_sockfd);
-                printf("Client Connected ...\n");
                 pthread_detach(per_client);
 
                 pthread_mutex_lock(&lock);
