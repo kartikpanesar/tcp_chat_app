@@ -9,25 +9,84 @@
 
 #define PORT 5050
 #define BUFF_MAX 1024
+#define CLIENT_MAX 64
 
-static char buffer[BUFF_MAX];
+
+// the suffix _s means nothing just a style convention.
+typedef struct client_s {
+        int client_sockfd;
+        struct sockaddr_in client_addr;
+        int status;
+} client_t ;
+
+static client_t clients[CLIENT_MAX] = {0};
+static int client_index = 0;
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+void broadcast(char *buffer, int bytes, int current_sfd){
+        int current_sockfd = current_sfd;
+        int this_sockfd = 0;
+
+        pthread_mutex_lock(&lock);
+        for(int j=0; j<client_index; j++){
+                this_sockfd = clients[j].client_sockfd;
+                if(current_sockfd == this_sockfd)
+                        continue;
+
+                int bytes_sent = 0;
+                int n = 0;
+                while(bytes_sent < bytes){
+                        n = send(this_sockfd, buffer, bytes-bytes_sent, 0);
+                        bytes_sent += n;
+                }
+        }
+        pthread_mutex_unlock(&lock);
+
+        return;
+}
 
 void *handle_client(void *arg){
         int client_sockfd = *(int *)arg;
+
+        char buffer[BUFF_MAX] = {0};
         int bytes_count = 0;
 
         printf("Client is connected ...\n");
 
-        while((bytes_count=read(STDIN_FILENO, buffer, BUFF_MAX))>0){
-
-                send(client_sockfd, buffer, bytes_count, 0);
-        }
-
-        if(bytes_count==-1){
-                perror("read error: ");
+        while((bytes_count=recv(client_sockfd, buffer, BUFF_MAX, 0))>0){
+                broadcast(buffer, bytes_count, client_sockfd);
         }
 
         close(client_sockfd);
+
+        return NULL;
+}
+
+
+void *listen_loop(void *arg){
+        int server_sockfd = *(int *)arg;
+        int rc = 0;
+
+        client_t current = {0};
+        socklen_t addrlen = sizeof(current.client_addr);
+
+        pthread_t per_client;
+
+
+        while(1){
+                current.client_sockfd = accept(server_sockfd, (struct sockaddr *)&current.client_addr, &addrlen);
+                current.status = 1;
+
+                pthread_create(&per_client, NULL, handle_client, &current.client_sockfd);
+                printf("Client Connected ...\n");
+                pthread_detach(per_client);
+
+                pthread_mutex_lock(&lock);
+                clients[client_index++] = current;
+                pthread_mutex_unlock(&lock);
+        }
 
         return NULL;
 }
@@ -77,7 +136,6 @@ int main(){
 
         int backlog = 10;
         int file_fd = 0;
-        int bytes_count = 0;
 
         if(listen(server_socketfd, backlog)==-1){
                 fprintf(stderr, "Error in listen syscall.\n");
@@ -88,32 +146,21 @@ int main(){
 
         printf("Listening on Port %d\n", PORT);
 
-        while(1){
-                client_sockfd = accept(server_socketfd,(struct sockaddr *) &client_addr, &client_sl);
-                if(client_sockfd==-1){
-                        fprintf(stderr, "Error while accept syscall.\n");
-                        perror("Error: ");
-                        continue;
-                }
 
-                int *p_client_sockfd = malloc(sizeof(int));
-                if(p_client_sockfd==NULL){
-                        perror("Malloc Error: ");
-                        close(client_sockfd);
-                        continue;
-                }
+        pthread_t listen_thread;
 
-                *p_client_sockfd = client_sockfd;
-
-                pthread_t thr;
-                rc = pthread_create(&thr, NULL, handle_client, p_client_sockfd);
-                if(rc!=0){
-                        fprintf(stderr, "Error while creating thread.\n");
-                        continue;
-                }
-
-                rc = pthread_detach(thr);
+        rc = pthread_create(&listen_thread, NULL, listen_loop, &server_socketfd);
+        if(rc!=0){
+                fprintf(stderr, "Error while creating thread.\n");
+                exit(1);
         }
+
+        pthread_join(listen_thread, NULL);
 
         return 0;
 }
+
+
+
+
+
