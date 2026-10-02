@@ -9,7 +9,7 @@
 
 #define PORT 5050
 #define BUFF_MAX 1024
-#define CLIENT_MAX 64
+#define CLIENT_MAX 256
 
 
 // the suffix _s means nothing just a style convention.
