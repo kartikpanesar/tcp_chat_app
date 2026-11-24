@@ -2,29 +2,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+// the suffix _s means nothing just a style convention.
 typedef struct client_s {
-        int client_sockfd;
+        int sockfd;
         int status;
         char *username;
 } client_t; 
 
 typedef struct client_node {
         struct client_node *prev;
-        client_t *client_data;
+        client_t *data;
         struct client_node *next;
 } client_n;
 
-typedef struct dynamic_array {
+typedef struct linked_list{
         client_n *head;
         client_n *tail;
-} client_array;
+} client_list;
 
-int same_username(client_array*, client_t*);
+int username_exist(client_list*, client_t*);
 
 
-client_array *client_array_init()
+client_list *client_list_init()
 {
-        client_array *c_array = malloc(sizeof(client_array));
+        client_list *c_array = malloc(sizeof(client_list));
 
         if(c_array == 0)
         {
@@ -32,16 +33,16 @@ client_array *client_array_init()
                 exit(1);
         }
 
-        c_array -> head = 0;
-        c_array -> tail = 0;
+        c_array -> head = NULL;
+        c_array -> tail = NULL;
 
         return c_array;
 }
 
 
-int client_add(client_array *c_array, client_t *him){
+int client_add(client_list *c_list, client_t *him){
 
-        if(same_username(c_array, him)==1)
+        if(username_exist(c_list, him)==1)
         {
                 fprintf(stderr, "Change username, This username is already taken.\n");
                 return 1;
@@ -66,32 +67,32 @@ int client_add(client_array *c_array, client_t *him){
                 return 1;
         }
 
-        node -> prev = 0;
-        node -> client_data = own;
-        node -> next = 0;
+        node -> prev = NULL;
+        node -> data = own;
+        node -> next = NULL;
 
-        if(c_array -> tail == 0)
+        if(c_list -> tail == NULL)
         {
-                c_array -> head = node;
-                c_array -> tail = node;
+                c_list -> head = node;
+                c_list -> tail = node;
         }
         else {
-                c_array -> tail -> next = node;
-                node -> prev = c_array -> tail;
-                c_array -> tail = node;
+                c_list -> tail -> next = node;
+                node -> prev = c_list -> tail;
+                c_list -> tail = node;
         }
 
         return 0;
 }
 
-int get_sockfd(client_array *c_array, char *username)
+int get_sockfd(client_list *c_list, char *username)
 {
-         client_n *current = c_array -> head;
+         client_n *current = c_list -> head;
 
          while(current != 0)
          {
-                 if(strcmp(current -> client_data -> username, username) == 0)
-                        return current -> client_data -> client_sockfd ;
+                 if(strcmp(current -> data -> username, username) == 0)
+                        return current -> data -> sockfd ;
 
                  current = current -> next;
          }
@@ -99,37 +100,39 @@ int get_sockfd(client_array *c_array, char *username)
          return -1;
 }
 
-void client_array_destroy(client_array *c_array)
+void client_list_destroy(client_list *c_list)
 {
-        client_n *current = c_array -> head;
+        client_n *current = c_list -> head;
         client_n *next = 0;
 
         while(current!=0){
                 next = current -> next;
 
-                free(current -> client_data);
+                free(current -> data);
                 free(current);
 
                 current = next;
         }
 
-        free(c_array);
+        free(c_list);
 }
 
 
-int same_username(client_array *c_array, client_t *him)
+int username_exist(client_list *c_list, client_t *him)
 {
-        client_n *current = c_array -> head;
+        if( him->username == NULL){
+                return 0;
+        }
+        client_n *current = c_list -> head;
 
         while(current != 0)
         {
-                if(strcmp(current -> client_data -> username, him -> username) == 0)
+                if(strcmp(current -> data -> username, him -> username) == 0)
                         return 1;
                 current = current -> next;
         }
 
         return 0;
-
 }
 
 

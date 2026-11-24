@@ -1,14 +1,14 @@
 
 
 typedef struct client_s {
-        int client_sockfd;
+        int sockfd;
         int status;
         char *username;
 } client_t; 
 
 typedef struct client_node {
         struct client_node *prev;
-        client_t *client_data;
+        client_t *data;
         struct client_node *next;
 } client_n;
 
